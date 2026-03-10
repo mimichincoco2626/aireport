@@ -253,15 +253,36 @@ body::before {
   html { font-size: 16px; }
   body { font-size: 1rem; -webkit-text-size-adjust: 100%; }
 
-  /* === Hero 三格對齊 → 直排 === */
+  /* === Hero 三格對齊 → 直排（用 ID 精準鎖定） === */
   .hero-stats-row {
     grid-template-columns: 1fr !important;
-    gap: 18px !important;
+    gap: 20px !important;
   }
-  .hero-stats-row > div { text-align: left !important; }
-  .hero-stats-row > div[style*="text-align:center"] { text-align: left !important; }
-  .hero-stats-row > div[style*="text-align:right"] { text-align: left !important; }
+  /* 用 ID 避免 inline style 覆蓋問題 */
+  #hero-goal-col,
+  #hero-est-col {
+    text-align: left !important;
+  }
   #hero-trend { justify-content: flex-start !important; }
+
+  /* === 三率圖：手機改為單欄 tall 版 === */
+  #three-rate-grid {
+    grid-template-columns: 1fr !important;
+  }
+  #three-rate-grid > div {
+    border-right: none !important;
+    border-bottom: 1px solid var(--border) !important;
+    border-top: 1px solid var(--border) !important;
+  }
+  #three-rate-grid > div:last-child {
+    border-bottom: none !important;
+  }
+  #three-rate-grid canvas {
+    height: 160px !important;
+  }
+  #three-rate-grid > div > div[style*="height:200px"] {
+    height: 160px !important;
+  }
 
   /* === Header === */
   .masthead { padding: 12px 14px 10px; }
@@ -753,7 +774,7 @@ textarea:focus { outline: none; border-color: var(--accent); }
     </div>
 
     <!-- 中：達成率大字 -->
-    <div style="text-align:center;">
+    <div id="hero-goal-col" style="text-align:center;">
       <div style="font-family:'DM Mono',monospace;font-size:0.60rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--gold);margin-bottom:8px;">🎯 年度目標達成率</div>
       <div style="display:flex;align-items:baseline;gap:8px;justify-content:center;">
         <span id="goal-pct" style="font-family:'Cormorant Garamond',serif;font-size:3.2rem;font-weight:700;color:var(--gold);line-height:1;">35.2%</span>
@@ -762,7 +783,7 @@ textarea:focus { outline: none; border-color: var(--accent); }
     </div>
 
     <!-- 右：估算 + 迷你sparkline -->
-    <div style="text-align:right;">
+    <div id="hero-est-col" style="text-align:right;">
       <div style="font-family:'DM Mono',monospace;font-size:0.60rem;letter-spacing:0.1em;color:var(--text-muted);margin-bottom:6px;">📈 按現況估算</div>
       <div id="goal-days" style="font-family:'DM Mono',monospace;font-size:1.1rem;color:var(--accent2);">–</div>
       <div style="font-size:0.65rem;color:var(--text-muted);">距達標日</div>
@@ -853,7 +874,7 @@ textarea:focus { outline: none; border-color: var(--accent); }
       <div class="chart-header" style="padding:16px 20px 12px;">
         <div class="chart-title">三率趨勢（初次發送）</div>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;width:100%;box-sizing:border-box;">
+      <div id="three-rate-grid" style="display:grid;grid-template-columns:1fr 1fr 1fr;width:100%;box-sizing:border-box;">
         <div style="border-right:1px solid var(--border);border-top:1px solid var(--border);padding:14px 16px;min-width:0;">
           <div style="font-family:'DM Mono',monospace;font-size:0.60rem;letter-spacing:0.12em;text-transform:uppercase;color:#e87aaa;margin-bottom:10px;">開信率 %</div>
           <div style="position:relative;height:200px;width:100%;"><canvas id="openRateOnlyChart" style="display:block;"></canvas></div>
@@ -2869,15 +2890,26 @@ function renderSubLog() {
 function applyMobileFixes() {
   if (window.innerWidth > 480) return;
 
-  // Hero 三欄訂報資訊 → 直排
-  var hero = document.getElementById('subscriber-hero');
-  if (hero) {
-    hero.querySelectorAll('div[style*="justify-content:space-between"], div[style*="justify-content: space-between"]').forEach(function(r) {
-      r.style.flexDirection = 'column';
-      r.style.gap = '16px';
+  // Hero 三格直排 + 對齊修正（ID 精準鎖定）
+  var heroRow = document.querySelector('.hero-stats-row');
+  if (heroRow) {
+    heroRow.style.gridTemplateColumns = '1fr';
+    heroRow.style.gap = '20px';
+  }
+  var goalCol = document.getElementById('hero-goal-col');
+  var estCol  = document.getElementById('hero-est-col');
+  if (goalCol) goalCol.style.textAlign = 'left';
+  if (estCol)  estCol.style.textAlign  = 'left';
+  var trendRow = document.getElementById('hero-trend');
+  if (trendRow) trendRow.style.justifyContent = 'flex-start';
+
+  // 三率圖 → 單欄
+  var threeGrid = document.getElementById('three-rate-grid');
+  if (threeGrid) {
+    threeGrid.style.gridTemplateColumns = '1fr';
+    threeGrid.querySelectorAll('div[style*="height:200px"]').forEach(function(d) {
+      d.style.height = '160px';
     });
-    var rightDiv = hero.querySelector('div[style*="text-align:right"]');
-    if (rightDiv) { rightDiv.style.textAlign = 'left'; }
   }
 
   // KPI inline grid → 2-col
