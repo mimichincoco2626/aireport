@@ -2,6 +2,7 @@
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' https://docs.google.com https://spreadsheets.google.com https://fonts.googleapis.com https://fonts.gstatic.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com data: blob:;">
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <!-- dashboard v3.2 -->
@@ -728,32 +729,6 @@ textarea:focus { outline: none; border-color: var(--accent); }
 </div>
 
 
-<!-- ── Google Sheets 自動同步狀態列 ── -->
-<div id="sheets-sync-bar" style="
-  display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;
-  padding:8px clamp(12px,4vw,48px);
-  background:rgba(30,33,64,0.8);
-  border-bottom:1px solid var(--border);
-  font-family:'DM Mono',monospace;font-size:0.65rem;
-  position:relative;z-index:1;
-">
-  <div style="display:flex;align-items:center;gap:10px;">
-    <span style="color:var(--text-muted);">📊 資料來源</span>
-    <span style="color:var(--accent2);">Google Sheets 自動同步</span>
-    <span id="sync-icon" style="color:var(--text-muted);font-size:0.9rem;display:inline-block;">⟳</span>
-    <span id="sync-label" style="color:var(--text-muted);">載入中…</span>
-  </div>
-  <div style="display:flex;align-items:center;gap:8px;">
-    <span id="sync-status" style="color:var(--accent4);display:none;font-size:0.62rem;"></span>
-    <button id="sync-btn" onclick="syncFromSheets()" style="
-      background:transparent;border:1px solid var(--border);
-      color:var(--text-muted);border-radius:2px;padding:4px 12px;
-      font-family:'DM Mono',monospace;font-size:0.62rem;cursor:pointer;
-      letter-spacing:0.05em;transition:all 0.2s;
-    ">手動重新整理</button>
-  </div>
-</div>
-
 <div class="tabs">
   <div class="tab active" onclick="switchTab('overview')">訂戶成效總覽</div>
   <div class="tab" onclick="switchTab('detail')">各期訂戶詳情</div>
@@ -1010,7 +985,7 @@ textarea:focus { outline: none; border-color: var(--accent); }
   <!-- ── 訂報人數（獨立區塊） ── -->
   <div class="input-section" style="margin-bottom:24px;">
     <div class="input-header" style="display:flex;align-items:center;justify-content:space-between;">
-      <h3>✦ 訂報人數更新</h3>
+      <h3>✦ 訂報人數更新</h3><span id="sheet-sync-status" style="font-family:'DM Mono',monospace;font-size:0.60rem;color:var(--text-muted);margin-left:10px;">從 Google Sheets 載入中…</span>
       <span style="font-family:'DM Mono',monospace;font-size:0.62rem;color:var(--text-muted);">不定時新增，獨立於發報期次</span>
     </div>
     <div class="input-body">
@@ -1398,267 +1373,118 @@ let SUBSCRIBER_LOG = [
   { date:'2026/3/9',   count:2827, note:'《親子共學 AI 指令懶人包》下載上線帶動訂閱' }
 ];
 
+
+// ══════════════════════════════════════════
+//  GOOGLE SHEETS → 訂報人數自動同步
+// ══════════════════════════════════════════
+// gviz/tq endpoint：Google 官方支援跨域，不需要 API key
+// Spreadsheet ID 取自網址列：spreadsheets/d/{ID}/edit
+const SHEET_ID = '1qLtQ-hGdR598W8mEgic28AdAwEEdg4Wn2Hcu51yiQOY';
+const SHEET_SUBS_CSV = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID + '/gviz/tq?tqx=out:csv&sheet=%E5%B7%A5%E4%BD%9C%E8%A1%A81';
+
+function parseSheetCSV(csv) {
+  const newSubs = [];
+  const rows = csv.split('\n');
+  for (let i = 1; i < rows.length; i++) {
+    // 處理 CSV 欄位（含引號）
+    const cols = [];
+    let cur = '', inQ = false;
+    for (const ch of rows[i]) {
+      if (ch === '"') { inQ = !inQ; }
+      else if (ch === ',' && !inQ) { cols.push(cur.trim()); cur = ''; }
+      else { cur += ch; }
+    }
+    cols.push(cur.trim());
+
+    const rawDate  = cols[0] || '';
+    const rawCount = (cols[4] || '').replace(/,/g, '');
+    const count    = parseInt(rawCount);
+    if (!rawDate || isNaN(count) || count <= 0) continue;
+
+    // 補年份：月份 ≤ 3 → 2026，否則 → 2025
+    let date = rawDate;
+    if (!rawDate.includes('20')) {
+      const mon = parseInt(rawDate.split('/')[0]);
+      date = (mon <= 3 ? '2026' : '2025') + '/' + rawDate;
+    }
+    const note = cols[1] || '';
+    newSubs.push({ date, count, note });
+  }
+  return newSubs;
+}
+
+function applySheetSubs(newSubs) {
+  if (newSubs.length === 0) throw new Error('找不到訂報人數資料（E欄為空？）');
+  SUBSCRIBER_LOG.length = 0;
+  newSubs.forEach(s => SUBSCRIBER_LOG.push(s));
+  SUBSCRIBER_LOG.sort((a, b) => new Date(a.date) - new Date(b.date));
+  renderSubscriberHero();
+  updateGoalTracker();
+  renderSubLog();
+  const statusEl = document.getElementById('sheet-sync-status');
+  if (statusEl) {
+    statusEl.textContent = '✓ 已與 Sheets 同步（' + newSubs.length + ' 筆）';
+    statusEl.style.color = 'var(--accent3)';
+  }
+  console.log('[Sheets] 訂報人數已更新，共', newSubs.length, '筆');
+}
+
+function syncSubscribersFromSheet() {
+  const statusEl = document.getElementById('sheet-sync-status');
+  if (statusEl) { statusEl.textContent = '從 Google Sheets 載入中…'; statusEl.style.color = 'var(--text-muted)'; }
+
+  // 方法一：fetch（支援 CORS 時優先）
+  fetch(SHEET_SUBS_CSV)
+    .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
+    .then(csv => { applySheetSubs(parseSheetCSV(csv)); })
+    .catch(() => {
+      // 方法二：XMLHttpRequest fallback
+      const xhr = new XMLHttpRequest();
+      xhr.open('GET', SHEET_SUBS_CSV, true);
+      xhr.onload = function() {
+        if (xhr.status === 200) {
+          try { applySheetSubs(parseSheetCSV(xhr.responseText)); }
+          catch(e) { syncFailed(e.message); }
+        } else { syncFailed('HTTP ' + xhr.status); }
+      };
+      xhr.onerror = function() {
+        // 方法三：載入為 <script> 的 no-cors image trick → 無法讀 body，改顯示說明
+        syncFailed('網路封鎖');
+      };
+      xhr.send();
+    });
+}
+
+function syncFailed(msg) {
+  console.warn('[Sheets] 同步失敗：', msg);
+  const statusEl = document.getElementById('sheet-sync-status');
+  if (statusEl) {
+    statusEl.textContent = '⚠ 使用內建資料（' + msg + '）';
+    statusEl.style.color = 'var(--accent4)';
+  }
+}
+
 // ══════════════════════════════════════════
 //  INIT
 // ══════════════════════════════════════════
-document.addEventListener('DOMContentLoaded', async () => {
+document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('report-date').textContent = new Date().toLocaleDateString('zh-TW',{year:'numeric',month:'long',day:'numeric'});
   const today = new Date().toISOString().split('T')[0];
   document.getElementById('new-date').value = today;
   const subDateEl = document.getElementById('sub-date');
   if (subDateEl) subDateEl.value = today;
-
-  // 先用內建資料渲染，讓畫面立即顯示
   renderAll();
   renderSubLog();
-
-  // 自動從 Google Sheets 抓最新資料
-  syncFromSheets();
+  // 自動從 Google Sheets 更新訂報人數
+  syncSubscribersFromSheet();
 });
 
 
 // ══════════════════════════════════════════
 //  GOOGLE SHEETS SYNC
 // ══════════════════════════════════════════
-// ── Google Sheets 公開 CSV 網址（單一工作表，同時含訂報人數+發報成效）
-const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSub959O3IvoTilnU9agcFoptHXcPVgiBcGh9Q-RxdiKPnzbhXXMiaEy0Q-9u3szWgsifNAJO9-_-7e/pub?output=csv';
 
-function syncFromSheets() {
-  const btn   = document.getElementById('sync-btn');
-  const icon  = document.getElementById('sync-icon');
-  const label = document.getElementById('sync-label');
-  const statusEl = document.getElementById('sync-status');
 
-  if (btn) { btn.disabled = true; }
-  if (icon) { icon.style.animation = 'spin 1s linear infinite'; }
-  if (label) { label.textContent = '連線中…'; }
-  if (statusEl) { statusEl.textContent = ''; statusEl.style.display = 'none'; }
-
-  fetch(SHEET_CSV_URL)
-    .then(r => {
-      if (!r.ok) throw new Error('無法存取試算表（HTTP ' + r.status + '）\n請確認試算表已發佈為 CSV');
-      return r.text();
-    })
-    .then(csv => {
-      const rows = parseCSV(csv);
-      if (rows.length < 2) throw new Error('試算表沒有資料');
-
-      const header = rows[0].map(h => h.trim());
-      console.log('欄位:', header);
-
-      // ── 欄位對應（確認版）──
-      // A:宣傳排程 B:社群管道 C:社群時段 D:連結 E:訂閱成效 F:(空)
-      // G:發報日期 H:Tr內容(期數+群組) I:開信主旨
-      // K:成功發送數 L:開信人數 M:點擊人數 N:退訂人數 O:信件可點擊數
-      // P:開信率 Q:點擊率 R:開點率 S:最高點擊 T:各區截圖 U:附註2
-      const col = name => { const i = header.indexOf(name); return i >= 0 ? i : null; };
-
-      const C = {
-        subCount:   col('訂閱成效') ?? col('訂報成效') ?? 4,  // E欄
-        date:       col('發報日期') ?? 6,                      // G欄（0-based → index 6）
-        issueGroup: col('Tr') ?? col('Tr 內容') ?? 7,          // H欄（index 7）
-        subject:    col('開信主旨') ?? 8,                      // I欄（index 8）
-        sent:       col('成功發送數') ?? col('成功發送數') ?? 10, // K欄（index 10）
-        opened:     col('開信人數') ?? 11,                     // L欄
-        clicked:    col('點擊人數') ?? 12,                     // M欄
-        unsub:      col('退訂人數') ?? 13,                     // N欄
-        clickable:  col('信件可點擊數') ?? col('信件可點擊數') ?? col('信件可點擊') ?? 14, // O欄
-        openRate:   col('開信率') ?? 15,                       // P欄
-        clickRate:  col('點擊率') ?? 16,                       // Q欄
-        ctOR:       col('開點率') ?? 17,                       // R欄
-        topClick:   col('最高點擊') ?? 18,                     // S欄
-      };
-
-      // ── 解析期數與群組 ──
-      // H欄格式: NO1訂戶、NO1訂戶次週、NO1非訂戶、NO2訂戶2/23次 等
-      function parseIssueGroup(raw) {
-        if (!raw) return { issue: '', group: '' };
-        raw = raw.trim();
-        // 從截圖看到的格式：NO1訂戶次週、NO2訂戶2/23次、NO1非訂戶、NO1非訂戶次週
-        const issueM = raw.match(/NO\d+/i);
-        const issue  = issueM ? issueM[0].toUpperCase() : '';
-        let group = '';
-        // 去掉期數和後面的日期數字（如 2/25、3/2、3/9）
-        const after = raw.replace(/NO\d+/i, '').replace(/\d+\/\d+/, '').trim();
-        if      (/非訂戶.*(次|週)/.test(after)) group = '非訂戶次週';
-        else if (/非訂戶/.test(after))          group = '非訂戶';
-        else if (/訂戶.*(次|週)/.test(after) || /次週/.test(raw) || /次$/.test(after)) group = '訂戶次週';
-        else if (/訂戶/.test(after))            group = '訂戶';
-        else                                    group = '訂戶';  // default
-        return { issue, group };
-      }
-
-      const pct = v => {
-        const s = String(v ?? '').replace('%','').trim();
-        const n = parseFloat(s);
-        return isNaN(n) ? 0 : n;
-      };
-      const num = v => {
-        const s = String(v ?? '').replace(/,/g,'').trim();
-        const n = parseInt(s);
-        return isNaN(n) ? 0 : n;
-      };
-
-      // ── 分離：發報成效 vs 訂報人數 ──
-      const newData = [];
-      const newSubs = [];
-
-      for (let i = 1; i < rows.length; i++) {
-        const r = rows[i];
-
-        // 訂報人數：E欄有數字的列
-        const subVal = num(r[C.subCount]);
-        if (subVal > 0) {
-          // A欄是宣傳排程的日期（格式 12/15 或 1/1），補上年份
-          let rawSubDate = r[0]?.trim() || '';
-          if (rawSubDate && !rawSubDate.includes('20')) {
-            // 短日期：月份<=3 推定2026，否則2025
-            const parts = rawSubDate.split('/');
-            const mon = parseInt(parts[0]);
-            const yr  = mon <= 3 ? '2026' : '2025';
-            rawSubDate = yr + '/' + rawSubDate;
-          }
-          const subNote = r[1]?.trim() || r[3]?.trim() || '';  // B欄社群管道 or D欄備註
-          newSubs.push({ date: rawSubDate, count: subVal, note: subNote });
-        }
-
-        // 發報成效：G欄有日期 且 H欄有期數群組
-        const rawDate = r[C.date]?.trim();
-        const rawIG   = r[C.issueGroup]?.trim();
-        if (!rawDate || !rawIG || !/NO\d+/i.test(rawIG)) continue;
-
-        const { issue, group } = parseIssueGroup(rawIG);
-        if (!issue || !group) continue;
-
-        const sentN    = num(r[C.sent]);
-        const openedN  = num(r[C.opened]);
-        const clickedN = num(r[C.clicked]);
-
-        // 優先用 Sheet 計算好的率，否則自動算
-        let openRateV  = pct(r[C.openRate]);
-        let clickRateV = pct(r[C.clickRate]);
-        let ctORV      = pct(r[C.ctOR]);
-        if (!openRateV  && sentN)    openRateV  = parseFloat((openedN  / sentN  * 100).toFixed(2));
-        if (!clickRateV && sentN)    clickRateV = parseFloat((clickedN / sentN  * 100).toFixed(2));
-        if (!ctORV      && openedN)  ctORV      = parseFloat((clickedN / openedN * 100).toFixed(2));
-
-        newData.push({
-          date:      rawDate,
-          issue:     issue,
-          group:     group,
-          subject:   r[C.subject]?.trim()  || '',
-          sent:      sentN,
-          opened:    openedN,
-          clicked:   clickedN,
-          unsub:     num(r[C.unsub]),
-          clickable: num(r[C.clickable]),
-          openRate:  openRateV,
-          clickRate: clickRateV,
-          ctOR:      ctORV,
-          topClick:  r[C.topClick]?.trim() || '',
-        });
-      }
-
-      if (newData.length === 0) throw new Error('未找到發報成效資料，請確認 G欄有日期、H欄有 NO1/NO2 等期數');
-
-      // ── 更新全域資料 ──
-      DATA.length = 0;
-      newData.forEach(d => DATA.push(d));
-
-      // 更新 ISSUES（依訂戶群組的期數）
-      const issueSet = [...new Set(DATA.filter(d => d.group === '訂戶' || d.group === '訂戶次週').map(d => d.issue))];
-      issueSet.sort();
-      ISSUES.length = 0;
-      issueSet.forEach(i => ISSUES.push(i));
-      selectedIssue = ISSUES[ISSUES.length - 1];
-
-      // 更新訂報人數（合併，避免重複）
-      if (newSubs.length > 0) {
-        // Keep existing entries not in sheet, add/replace sheet ones
-        newSubs.forEach(s => {
-          const exists = SUBSCRIBER_LOG.findIndex(e => e.date === s.date && e.count === s.count);
-          if (exists < 0) SUBSCRIBER_LOG.push(s);
-        });
-        SUBSCRIBER_LOG.sort((a, b) => new Date(a.date) - new Date(b.date));
-      }
-
-      // ── 重繪全部 ──
-      renderAll();
-      renderIssueNav();
-      renderIssueDetail(selectedIssue);
-      renderAllDataTable();
-      renderSubLog();
-      renderSubscriberHero();
-      updateGoalTracker();
-
-      // Success UI
-      if (icon)  { icon.style.animation = ''; icon.textContent = '✓'; icon.style.color = 'var(--accent3)'; }
-      if (label) { label.textContent = '已更新（' + newData.length + ' 筆發報 ＋ ' + newSubs.length + ' 筆訂報）'; label.style.color = 'var(--accent3)'; }
-      if (btn)   { btn.style.borderColor = 'var(--accent3)'; btn.disabled = false; }
-
-      setTimeout(() => {
-        if (icon)  { icon.textContent = '⟳'; icon.style.color = ''; }
-        if (label) { label.textContent = '已與 Sheets 同步'; label.style.color = ''; }
-        if (btn)   { btn.style.borderColor = ''; }
-      }, 5000);
-    })
-    .catch(err => {
-      console.error('Sheets sync error:', err);
-      if (icon)  { icon.style.animation = ''; icon.textContent = '✕'; icon.style.color = 'var(--accent4)'; }
-      if (label) { label.textContent = '連線失敗'; label.style.color = 'var(--accent4)'; }
-      if (btn)   { btn.style.borderColor = 'var(--accent4)'; btn.disabled = false; }
-      if (statusEl) {
-        statusEl.textContent = '⚠ ' + err.message;
-        statusEl.style.display = 'block';
-        statusEl.style.color = 'var(--accent4)';
-      }
-      setTimeout(() => {
-        if (icon)  { icon.textContent = '⟳'; icon.style.color = ''; }
-        if (label) { label.textContent = '從 Sheets 更新'; label.style.color = ''; }
-        if (btn)   { btn.style.borderColor = ''; }
-      }, 8000);
-    });
-}
-
-function showSyncError(msg) {
-  let el = document.getElementById('sync-error-toast');
-  if (!el) {
-    el = document.createElement('div');
-    el.id = 'sync-error-toast';
-    el.style.cssText = `
-      position:fixed;bottom:24px;left:50%;transform:translateX(-50%);
-      background:#2a1a1a;border:1px solid var(--accent4);border-radius:6px;
-      padding:14px 20px;font-family:'DM Mono',monospace;font-size:0.72rem;
-      color:var(--accent4);z-index:9999;max-width:420px;line-height:1.6;
-      box-shadow:0 8px 32px rgba(0,0,0,0.5);
-    `;
-    document.body.appendChild(el);
-  }
-  el.innerHTML = `<strong>⚠ 同步失敗</strong><br>${msg}<br><br>
-    <span style="color:var(--text-muted);">請到試算表 → 共用 → 將存取權改為「知道連結的人 · 檢視者」</span>`;
-  el.style.display = 'block';
-  setTimeout(() => { el.style.display = 'none'; }, 10000);
-}
-
-// CSV parser (handles quoted fields with commas)
-function parseCSV(text) {
-  const rows = [];
-  const lines = text.split(/\r?\n/);
-  for (const line of lines) {
-    if (!line.trim()) continue;
-    const row = [];
-    let cur = '', inQ = false;
-    for (let i = 0; i < line.length; i++) {
-      const c = line[i];
-      if (c === '"') { inQ = !inQ; }
-      else if (c === ',' && !inQ) { row.push(cur); cur = ''; }
-      else { cur += c; }
-    }
-    row.push(cur);
-    rows.push(row);
-  }
-  return rows;
-}
 
 function renderAll() {
   renderSubscriberHero();
