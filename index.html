@@ -253,17 +253,11 @@ body::before {
   html { font-size: 16px; }
   body { font-size: 1rem; -webkit-text-size-adjust: 100%; }
 
-  /* === Hero 三格對齊 → 直排（用 ID 精準鎖定） === */
+  /* === Hero 三格對齊 → 直排 === */
   .hero-stats-row {
     grid-template-columns: 1fr !important;
     gap: 20px !important;
   }
-  /* 用 ID 避免 inline style 覆蓋問題 */
-  #hero-goal-col,
-  #hero-est-col {
-    text-align: left !important;
-  }
-  #hero-trend { justify-content: flex-start !important; }
 
   /* === 三率圖：手機改為單欄 tall 版 === */
   #three-rate-grid {
@@ -733,6 +727,33 @@ textarea:focus { outline: none; border-color: var(--accent); }
     <div id="report-date" style="font-size:12px;color:var(--text-muted);"></div>
 </div>
 
+
+<!-- ── Google Sheets 自動同步狀態列 ── -->
+<div id="sheets-sync-bar" style="
+  display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;
+  padding:8px clamp(12px,4vw,48px);
+  background:rgba(30,33,64,0.8);
+  border-bottom:1px solid var(--border);
+  font-family:'DM Mono',monospace;font-size:0.65rem;
+  position:relative;z-index:1;
+">
+  <div style="display:flex;align-items:center;gap:10px;">
+    <span style="color:var(--text-muted);">📊 資料來源</span>
+    <span style="color:var(--accent2);">Google Sheets 自動同步</span>
+    <span id="sync-icon" style="color:var(--text-muted);font-size:0.9rem;display:inline-block;">⟳</span>
+    <span id="sync-label" style="color:var(--text-muted);">載入中…</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:8px;">
+    <span id="sync-status" style="color:var(--accent4);display:none;font-size:0.62rem;"></span>
+    <button id="sync-btn" onclick="syncFromSheets()" style="
+      background:transparent;border:1px solid var(--border);
+      color:var(--text-muted);border-radius:2px;padding:4px 12px;
+      font-family:'DM Mono',monospace;font-size:0.62rem;cursor:pointer;
+      letter-spacing:0.05em;transition:all 0.2s;
+    ">手動重新整理</button>
+  </div>
+</div>
+
 <div class="tabs">
   <div class="tab active" onclick="switchTab('overview')">訂戶成效總覽</div>
   <div class="tab" onclick="switchTab('detail')">各期訂戶詳情</div>
@@ -774,23 +795,23 @@ textarea:focus { outline: none; border-color: var(--accent); }
     </div>
 
     <!-- 中：達成率大字 -->
-    <div id="hero-goal-col" style="text-align:center;">
+    <div id="hero-goal-col" style="text-align:left;">
       <div style="font-family:'DM Mono',monospace;font-size:0.60rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--gold);margin-bottom:8px;">🎯 年度目標達成率</div>
-      <div style="display:flex;align-items:baseline;gap:8px;justify-content:center;">
+      <div style="display:flex;align-items:baseline;gap:8px;justify-content:flex-start;">
         <span id="goal-pct" style="font-family:'Cormorant Garamond',serif;font-size:3.2rem;font-weight:700;color:var(--gold);line-height:1;">35.2%</span>
       </div>
       <div style="font-size:0.70rem;color:var(--text-muted);margin-top:4px;">目標：<span style="color:var(--gold);">8,000 人</span>（年底）　尚差：<span id="goal-gap" style="color:var(--accent4);font-weight:600;">5,188 人</span></div>
     </div>
 
     <!-- 右：估算 + 迷你sparkline -->
-    <div id="hero-est-col" style="text-align:right;">
+    <div id="hero-est-col" style="text-align:left;">
       <div style="font-family:'DM Mono',monospace;font-size:0.60rem;letter-spacing:0.1em;color:var(--text-muted);margin-bottom:6px;">📈 按現況估算</div>
       <div id="goal-days" style="font-family:'DM Mono',monospace;font-size:1.1rem;color:var(--accent2);">–</div>
       <div style="font-size:0.65rem;color:var(--text-muted);">距達標日</div>
       <div style="font-size:0.60rem;color:var(--text-muted);margin-top:8px;">每日需增加</div>
       <div id="goal-daily" style="font-family:'DM Mono',monospace;font-size:1rem;color:var(--accent3);">–</div>
       <div style="font-size:0.65rem;color:var(--text-muted);">人/天</div>
-      <div id="hero-trend" style="margin-top:10px;display:flex;gap:4px;justify-content:flex-end;align-items:flex-end;height:28px;"></div>
+      <div id="hero-trend" style="margin-top:10px;display:flex;gap:4px;justify-content:flex-start;align-items:flex-end;height:28px;"></div>
     </div>
   </div>
 
@@ -1380,150 +1401,222 @@ let SUBSCRIBER_LOG = [
 // ══════════════════════════════════════════
 //  INIT
 // ══════════════════════════════════════════
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('report-date').textContent = new Date().toLocaleDateString('zh-TW',{year:'numeric',month:'long',day:'numeric'});
   const today = new Date().toISOString().split('T')[0];
   document.getElementById('new-date').value = today;
   const subDateEl = document.getElementById('sub-date');
   if (subDateEl) subDateEl.value = today;
+
+  // 先用內建資料渲染，讓畫面立即顯示
   renderAll();
   renderSubLog();
+
+  // 自動從 Google Sheets 抓最新資料
+  syncFromSheets();
 });
 
 
 // ══════════════════════════════════════════
 //  GOOGLE SHEETS SYNC
 // ══════════════════════════════════════════
-const SHEET_ID  = '1higeXNWiA2qXPMQLnwskyJbwbrDlF03CBStUItZU-RY';
-const GID_PERF  = '2109800807';   // 發報成效工作表
-
-// Subscriber log sheet GID — update if different
-// Check your spreadsheet: the subscriber-count tab
-const GID_SUBS  = '0';            // 預設第一張工作表，可改
+// ── Google Sheets 公開 CSV 網址（單一工作表，同時含訂報人數+發報成效）
+const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSub959O3IvoTilnU9agcFoptHXcPVgiBcGh9Q-RxdiKPnzbhXXMiaEy0Q-9u3szWgsifNAJO9-_-7e/pub?output=csv';
 
 function syncFromSheets() {
   const btn   = document.getElementById('sync-btn');
   const icon  = document.getElementById('sync-icon');
   const label = document.getElementById('sync-label');
+  const statusEl = document.getElementById('sync-status');
 
-  btn.disabled = true;
-  icon.style.animation  = 'spin 1s linear infinite';
-  label.textContent = '連線中…';
+  if (btn) { btn.disabled = true; }
+  if (icon) { icon.style.animation = 'spin 1s linear infinite'; }
+  if (label) { label.textContent = '連線中…'; }
+  if (statusEl) { statusEl.textContent = ''; statusEl.style.display = 'none'; }
 
-  const perfURL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${GID_PERF}`;
-
-  fetch(perfURL)
+  fetch(SHEET_CSV_URL)
     .then(r => {
-      if (!r.ok) throw new Error('無法存取試算表（HTTP ' + r.status + '）\n請確認試算表已設為「知道連結的人可檢視」');
+      if (!r.ok) throw new Error('無法存取試算表（HTTP ' + r.status + '）\n請確認試算表已發佈為 CSV');
       return r.text();
     })
     .then(csv => {
       const rows = parseCSV(csv);
-      if (rows.length < 2) throw new Error('試算表沒有資料列');
+      if (rows.length < 2) throw new Error('試算表沒有資料');
 
       const header = rows[0].map(h => h.trim());
-      console.log('試算表欄位:', header);
+      console.log('欄位:', header);
 
-      // Map columns — supports both Chinese and positional fallback
-      const col = name => {
-        const idx = header.indexOf(name);
-        return idx >= 0 ? idx : null;
-      };
+      // ── 欄位對應（確認版）──
+      // A:宣傳排程 B:社群管道 C:社群時段 D:連結 E:訂閱成效 F:(空)
+      // G:發報日期 H:Tr內容(期數+群組) I:開信主旨
+      // K:成功發送數 L:開信人數 M:點擊人數 N:退訂人數 O:信件可點擊數
+      // P:開信率 Q:點擊率 R:開點率 S:最高點擊 T:各區截圖 U:附註2
+      const col = name => { const i = header.indexOf(name); return i >= 0 ? i : null; };
 
-      // Column mapping (adjust if your headers differ)
       const C = {
-        date:      col('日期')      ?? 0,
-        issue:     col('期數')      ?? 1,
-        group:     col('群組')      ?? 2,
-        subject:   col('主旨') ?? col('主題') ?? col('信件主旨') ?? 3,
-        sent:      col('發送數') ?? col('發送') ?? 4,
-        opened:    col('開信數') ?? col('開信') ?? 5,
-        clicked:   col('點擊數') ?? col('點擊') ?? 6,
-        unsub:     col('退訂數') ?? col('退訂') ?? 7,
-        clickable: col('可點擊數') ?? col('可點擊') ?? 8,
-        openRate:  col('開信率') ?? 9,
-        clickRate: col('點擊率') ?? 10,
-        ctOR:      col('開點率') ?? 11,
-        topClick:  col('熱門點擊') ?? col('熱門連結') ?? 12,
+        subCount:   col('訂閱成效') ?? col('訂報成效') ?? 4,  // E欄
+        date:       col('發報日期') ?? 6,                      // G欄（0-based → index 6）
+        issueGroup: col('Tr') ?? col('Tr 內容') ?? 7,          // H欄（index 7）
+        subject:    col('開信主旨') ?? 8,                      // I欄（index 8）
+        sent:       col('成功發送數') ?? col('成功發送數') ?? 10, // K欄（index 10）
+        opened:     col('開信人數') ?? 11,                     // L欄
+        clicked:    col('點擊人數') ?? 12,                     // M欄
+        unsub:      col('退訂人數') ?? 13,                     // N欄
+        clickable:  col('信件可點擊數') ?? col('信件可點擊數') ?? col('信件可點擊') ?? 14, // O欄
+        openRate:   col('開信率') ?? 15,                       // P欄
+        clickRate:  col('點擊率') ?? 16,                       // Q欄
+        ctOR:       col('開點率') ?? 17,                       // R欄
+        topClick:   col('最高點擊') ?? 18,                     // S欄
       };
 
+      // ── 解析期數與群組 ──
+      // H欄格式: NO1訂戶、NO1訂戶次週、NO1非訂戶、NO2訂戶2/23次 等
+      function parseIssueGroup(raw) {
+        if (!raw) return { issue: '', group: '' };
+        raw = raw.trim();
+        // 從截圖看到的格式：NO1訂戶次週、NO2訂戶2/23次、NO1非訂戶、NO1非訂戶次週
+        const issueM = raw.match(/NO\d+/i);
+        const issue  = issueM ? issueM[0].toUpperCase() : '';
+        let group = '';
+        // 去掉期數和後面的日期數字（如 2/25、3/2、3/9）
+        const after = raw.replace(/NO\d+/i, '').replace(/\d+\/\d+/, '').trim();
+        if      (/非訂戶.*(次|週)/.test(after)) group = '非訂戶次週';
+        else if (/非訂戶/.test(after))          group = '非訂戶';
+        else if (/訂戶.*(次|週)/.test(after) || /次週/.test(raw) || /次$/.test(after)) group = '訂戶次週';
+        else if (/訂戶/.test(after))            group = '訂戶';
+        else                                    group = '訂戶';  // default
+        return { issue, group };
+      }
+
+      const pct = v => {
+        const s = String(v ?? '').replace('%','').trim();
+        const n = parseFloat(s);
+        return isNaN(n) ? 0 : n;
+      };
+      const num = v => {
+        const s = String(v ?? '').replace(/,/g,'').trim();
+        const n = parseInt(s);
+        return isNaN(n) ? 0 : n;
+      };
+
+      // ── 分離：發報成效 vs 訂報人數 ──
       const newData = [];
+      const newSubs = [];
+
       for (let i = 1; i < rows.length; i++) {
         const r = rows[i];
-        if (!r[C.date] || !r[C.issue]) continue;  // skip empty rows
 
-        const pct = v => parseFloat(String(v ?? '').replace('%','').trim()) || 0;
-        const num = v => parseInt(String(v ?? '').replace(/,/g,'').trim()) || 0;
+        // 訂報人數：E欄有數字的列
+        const subVal = num(r[C.subCount]);
+        if (subVal > 0) {
+          // A欄是宣傳排程的日期（格式 12/15 或 1/1），補上年份
+          let rawSubDate = r[0]?.trim() || '';
+          if (rawSubDate && !rawSubDate.includes('20')) {
+            // 短日期：月份<=3 推定2026，否則2025
+            const parts = rawSubDate.split('/');
+            const mon = parseInt(parts[0]);
+            const yr  = mon <= 3 ? '2026' : '2025';
+            rawSubDate = yr + '/' + rawSubDate;
+          }
+          const subNote = r[1]?.trim() || r[3]?.trim() || '';  // B欄社群管道 or D欄備註
+          newSubs.push({ date: rawSubDate, count: subVal, note: subNote });
+        }
+
+        // 發報成效：G欄有日期 且 H欄有期數群組
+        const rawDate = r[C.date]?.trim();
+        const rawIG   = r[C.issueGroup]?.trim();
+        if (!rawDate || !rawIG || !/NO\d+/i.test(rawIG)) continue;
+
+        const { issue, group } = parseIssueGroup(rawIG);
+        if (!issue || !group) continue;
+
+        const sentN    = num(r[C.sent]);
+        const openedN  = num(r[C.opened]);
+        const clickedN = num(r[C.clicked]);
+
+        // 優先用 Sheet 計算好的率，否則自動算
+        let openRateV  = pct(r[C.openRate]);
+        let clickRateV = pct(r[C.clickRate]);
+        let ctORV      = pct(r[C.ctOR]);
+        if (!openRateV  && sentN)    openRateV  = parseFloat((openedN  / sentN  * 100).toFixed(2));
+        if (!clickRateV && sentN)    clickRateV = parseFloat((clickedN / sentN  * 100).toFixed(2));
+        if (!ctORV      && openedN)  ctORV      = parseFloat((clickedN / openedN * 100).toFixed(2));
 
         newData.push({
-          date:      r[C.date]?.trim()   || '',
-          issue:     r[C.issue]?.trim()  || '',
-          group:     r[C.group]?.trim()  || '',
-          subject:   r[C.subject]?.trim()|| '',
-          sent:      num(r[C.sent]),
-          opened:    num(r[C.opened]),
-          clicked:   num(r[C.clicked]),
+          date:      rawDate,
+          issue:     issue,
+          group:     group,
+          subject:   r[C.subject]?.trim()  || '',
+          sent:      sentN,
+          opened:    openedN,
+          clicked:   clickedN,
           unsub:     num(r[C.unsub]),
           clickable: num(r[C.clickable]),
-          openRate:  pct(r[C.openRate]),
-          clickRate: pct(r[C.clickRate]),
-          ctOR:      pct(r[C.ctOR]),
+          openRate:  openRateV,
+          clickRate: clickRateV,
+          ctOR:      ctORV,
           topClick:  r[C.topClick]?.trim() || '',
         });
       }
 
-      if (newData.length === 0) throw new Error('解析後沒有有效資料，請確認欄位格式');
+      if (newData.length === 0) throw new Error('未找到發報成效資料，請確認 G欄有日期、H欄有 NO1/NO2 等期數');
 
-      // Update global DATA + ISSUES
+      // ── 更新全域資料 ──
       DATA.length = 0;
       newData.forEach(d => DATA.push(d));
 
-      const issueSet = [...new Set(DATA.filter(d=>d.group==='訂戶').map(d=>d.issue))];
+      // 更新 ISSUES（依訂戶群組的期數）
+      const issueSet = [...new Set(DATA.filter(d => d.group === '訂戶' || d.group === '訂戶次週').map(d => d.issue))];
+      issueSet.sort();
       ISSUES.length = 0;
       issueSet.forEach(i => ISSUES.push(i));
       selectedIssue = ISSUES[ISSUES.length - 1];
 
+      // 更新訂報人數（合併，避免重複）
+      if (newSubs.length > 0) {
+        // Keep existing entries not in sheet, add/replace sheet ones
+        newSubs.forEach(s => {
+          const exists = SUBSCRIBER_LOG.findIndex(e => e.date === s.date && e.count === s.count);
+          if (exists < 0) SUBSCRIBER_LOG.push(s);
+        });
+        SUBSCRIBER_LOG.sort((a, b) => new Date(a.date) - new Date(b.date));
+      }
+
+      // ── 重繪全部 ──
       renderAll();
       renderIssueNav();
       renderIssueDetail(selectedIssue);
       renderAllDataTable();
+      renderSubLog();
+      renderSubscriberHero();
+      updateGoalTracker();
 
-      // Success state
-      icon.style.animation = '';
-      icon.textContent = '✓';
-      icon.style.color = 'var(--accent3)';
-      label.textContent = `已更新（${newData.length} 筆）`;
-      label.style.color = 'var(--accent3)';
-      btn.style.borderColor = 'var(--accent3)';
-      btn.disabled = false;
+      // Success UI
+      if (icon)  { icon.style.animation = ''; icon.textContent = '✓'; icon.style.color = 'var(--accent3)'; }
+      if (label) { label.textContent = '已更新（' + newData.length + ' 筆發報 ＋ ' + newSubs.length + ' 筆訂報）'; label.style.color = 'var(--accent3)'; }
+      if (btn)   { btn.style.borderColor = 'var(--accent3)'; btn.disabled = false; }
 
       setTimeout(() => {
-        icon.textContent = '⟳';
-        icon.style.color = '';
-        label.textContent = '從 Sheets 更新';
-        label.style.color = '';
-        btn.style.borderColor = '';
-      }, 4000);
+        if (icon)  { icon.textContent = '⟳'; icon.style.color = ''; }
+        if (label) { label.textContent = '已與 Sheets 同步'; label.style.color = ''; }
+        if (btn)   { btn.style.borderColor = ''; }
+      }, 5000);
     })
     .catch(err => {
-      icon.style.animation = '';
-      icon.textContent = '✕';
-      icon.style.color = 'var(--accent4)';
-      label.textContent = '連線失敗';
-      label.style.color = 'var(--accent4)';
-      btn.style.borderColor = 'var(--accent4)';
-      btn.disabled = false;
-
-      // Show detailed error
-      showSyncError(err.message);
-
+      console.error('Sheets sync error:', err);
+      if (icon)  { icon.style.animation = ''; icon.textContent = '✕'; icon.style.color = 'var(--accent4)'; }
+      if (label) { label.textContent = '連線失敗'; label.style.color = 'var(--accent4)'; }
+      if (btn)   { btn.style.borderColor = 'var(--accent4)'; btn.disabled = false; }
+      if (statusEl) {
+        statusEl.textContent = '⚠ ' + err.message;
+        statusEl.style.display = 'block';
+        statusEl.style.color = 'var(--accent4)';
+      }
       setTimeout(() => {
-        icon.textContent = '⟳';
-        icon.style.color = '';
-        label.textContent = '從 Sheets 更新';
-        label.style.color = '';
-        btn.style.borderColor = '';
-      }, 6000);
+        if (icon)  { icon.textContent = '⟳'; icon.style.color = ''; }
+        if (label) { label.textContent = '從 Sheets 更新'; label.style.color = ''; }
+        if (btn)   { btn.style.borderColor = ''; }
+      }, 8000);
     });
 }
 
