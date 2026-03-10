@@ -157,8 +157,8 @@ body::before {
 .kpi:hover { background: var(--surface2); }
 .kpi-label {
   font-family: 'DM Mono', monospace;
-  font-size: 0.6rem; letter-spacing: 0.15em; text-transform: uppercase;
-  color: var(--text-muted); margin-bottom: 12px;
+  font-size: 0.68rem; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--text-muted); margin-bottom: 10px;
 }
 .kpi-value {
   font-family: 'Cormorant Garamond', serif;
@@ -253,6 +253,16 @@ body::before {
   html { font-size: 16px; }
   body { font-size: 1rem; -webkit-text-size-adjust: 100%; }
 
+  /* === Hero 三格對齊 → 直排 === */
+  .hero-stats-row {
+    grid-template-columns: 1fr !important;
+    gap: 18px !important;
+  }
+  .hero-stats-row > div { text-align: left !important; }
+  .hero-stats-row > div[style*="text-align:center"] { text-align: left !important; }
+  .hero-stats-row > div[style*="text-align:right"] { text-align: left !important; }
+  #hero-trend { justify-content: flex-start !important; }
+
   /* === Header === */
   .masthead { padding: 12px 14px 10px; }
   .brand-title { font-size: 1.25rem; }
@@ -280,6 +290,10 @@ body::before {
 
   /* === Hero 訂報區塊 === */
   #subscriber-hero { padding: 14px !important; }
+  #subscriber-hero div[style*="font-size:0.60rem"],
+  #subscriber-hero div[style*="font-size: 0.60rem"] { font-size: 0.70rem !important; }
+  #subscriber-hero div[style*="font-size:0.65rem"],
+  #subscriber-hero div[style*="font-size: 0.65rem"] { font-size: 0.72rem !important; }
   #hero-count { font-size: 2.8rem !important; }
   #goal-pct { font-size: 2.4rem !important; }
   #hero-growth { font-size: 0.85rem !important; }
@@ -300,8 +314,8 @@ body::before {
   .kpi-grid { grid-template-columns: 1fr 1fr !important; gap: 0 !important; }
   .kpi { padding: 14px 12px !important; }
   .kpi-value { font-size: 1.8rem !important; }
-  .kpi-label { font-size: 0.62rem !important; letter-spacing: 0.05em !important; margin-bottom: 8px !important; }
-  .kpi-sub { font-size: 0.65rem !important; margin-top: 4px !important; }
+  .kpi-label { font-size: 0.75rem !important; letter-spacing: 0.04em !important; margin-bottom: 8px !important; }
+  .kpi-sub { font-size: 0.72rem !important; margin-top: 4px !important; }
   .kpi-unit { font-size: 0.9rem !important; }
 
   /* === 圖表單欄 === */
@@ -725,7 +739,7 @@ textarea:focus { outline: none; border-color: var(--accent); }
   <div style="position:absolute;right:32px;top:50%;transform:translateY(-50%);font-size:5rem;opacity:0.04;font-family:'Cormorant Garamond',serif;pointer-events:none;">訂</div>
 
   <!-- 上排：訂報人數 + 成長 + 目標數字 -->
-  <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:14px;margin-bottom:18px;row-gap:16px;">
+  <div class="hero-stats-row" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:18px;">
 
     <!-- 左：現況人數 -->
     <div>
