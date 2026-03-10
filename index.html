@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+ <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
@@ -1083,17 +1083,27 @@ textarea:focus { outline: none; border-color: var(--accent); }
         color:var(--text);border-radius:2px;font-family:'DM Mono',monospace;font-size:0.80rem;box-sizing:border-box;">
     </div>
 
-    <!-- 報名人數記錄（多筆，依日期） -->
-    <div style="margin-bottom:20px;">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-        <label style="font-family:'DM Mono',monospace;font-size:0.62rem;letter-spacing:0.1em;color:var(--text-muted);">報名人數記錄（依日期）</label>
-        <button onclick="addRegRow()" style="
-          background:transparent;border:1px solid var(--border);color:var(--text-muted);
+    <!-- 實際報名人數 -->
+    <div style="margin-bottom:16px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+        <label style="font-family:'DM Mono',monospace;font-size:0.62rem;letter-spacing:0.1em;color:var(--accent3);">✦ 實際報名人數（依日期）</label>
+        <button onclick="addActualRow()" style="
+          background:transparent;border:1px solid rgba(232,122,170,0.3);color:var(--accent3);
           border-radius:2px;padding:4px 12px;font-family:'DM Mono',monospace;
-          font-size:0.62rem;cursor:pointer;
-        ">＋ 新增記錄</button>
+          font-size:0.62rem;cursor:pointer;">＋ 新增</button>
       </div>
-      <div id="reg-rows"></div>
+      <div id="actual-rows"></div>
+    </div>
+    <!-- 早鳥意願登記 -->
+    <div style="margin-bottom:20px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+        <label style="font-family:'DM Mono',monospace;font-size:0.62rem;letter-spacing:0.1em;color:var(--gold);">☆ 早鳥意願登記（尚未正式報名）</label>
+        <button onclick="addEarlyRow()" style="
+          background:transparent;border:1px solid rgba(232,168,212,0.3);color:var(--gold);
+          border-radius:2px;padding:4px 12px;font-family:'DM Mono',monospace;
+          font-size:0.62rem;cursor:pointer;">＋ 新增</button>
+      </div>
+      <div id="early-rows"></div>
     </div>
 
     <div style="display:flex;justify-content:flex-end;gap:10px;">
@@ -2267,7 +2277,8 @@ async function initLectures() {
     date: '6月初',
     goal: 600,
     note: '',
-    regs: [{ date: '2026/3/10', count: 7, note: '早鳥報名' }]
+    earlyBirds: [{ date: '2026/3/10', count: 7, note: '填表登記意願' }],
+    actualRegs:  []
   }];
   try {
     const res = await window.storage.get('lectures_v2');
@@ -2300,9 +2311,14 @@ function openLectureModal(id) {
     document.getElementById('lec-date').value  = lec.date  || '';
     document.getElementById('lec-goal').value  = lec.goal  || '';
     document.getElementById('lec-note').value  = lec.note  || '';
-    const regRows = document.getElementById('reg-rows');
-    regRows.innerHTML = '';
-    (lec.regs || []).forEach(r => addRegRow(r.date, r.count, r.note));
+    document.getElementById('actual-rows').innerHTML = '';
+    document.getElementById('early-rows').innerHTML  = '';
+    const actualArr = lec.actualRegs || lec.regs || [];
+    const earlyArr  = lec.earlyBirds || [];
+    if (actualArr.length) actualArr.forEach(r => addActualRow(r.date, r.count, r.note));
+    else addActualRow();
+    if (earlyArr.length)  earlyArr.forEach(r => addEarlyRow(r.date, r.count, r.note));
+    else addEarlyRow();
     updateLecAchievement();
   } else {
     document.getElementById('lecture-modal-title').textContent = '新增講座';
@@ -2310,9 +2326,11 @@ function openLectureModal(id) {
     document.getElementById('lec-date').value  = '';
     document.getElementById('lec-goal').value  = '';
     document.getElementById('lec-note').value  = '';
-    document.getElementById('reg-rows').innerHTML = '';
+    document.getElementById('actual-rows').innerHTML = '';
+    document.getElementById('early-rows').innerHTML  = '';
     document.getElementById('lec-achievement-bar').style.display = 'none';
-    addRegRow(); // start with one empty row
+    addActualRow();
+    addEarlyRow();
   }
 }
 
@@ -2320,8 +2338,8 @@ function closeLectureModal() {
   document.getElementById('lecture-modal').style.display = 'none';
 }
 
-function addRegRow(date='', count='', note='') {
-  const container = document.getElementById('reg-rows');
+function _makeRegRow(containerId, borderColor, date, count, note) {
+  const container = document.getElementById(containerId);
   const div = document.createElement('div');
   div.style.cssText = 'display:grid;grid-template-columns:140px 90px 1fr auto;gap:8px;margin-bottom:8px;align-items:center;';
   div.innerHTML = `
@@ -2330,57 +2348,77 @@ function addRegRow(date='', count='', note='') {
       color:var(--text);border-radius:2px;font-family:'DM Mono',monospace;font-size:0.72rem;width:100%;box-sizing:border-box;">
     <input type="number" placeholder="人數" value="${count}" min="0"
       oninput="updateLecAchievement()"
-      style="padding:8px 10px;background:var(--bg);border:1px solid var(--border);
+      style="padding:8px 10px;background:var(--bg);border:1px solid ${borderColor};
       color:var(--text);border-radius:2px;font-family:'DM Mono',monospace;font-size:0.72rem;width:100%;box-sizing:border-box;text-align:right;">
-    <input type="text" placeholder="備註（如：早鳥報名）" value="${note}"
+    <input type="text" placeholder="備註" value="${note}"
       style="padding:8px 10px;background:var(--bg);border:1px solid var(--border);
       color:var(--text);border-radius:2px;font-family:'DM Mono',monospace;font-size:0.72rem;width:100%;box-sizing:border-box;">
-    <button onclick="this.parentElement.remove();updateLecAchievement();" style="
-      background:none;border:1px solid var(--border);color:var(--text-muted);
-      width:30px;height:34px;border-radius:2px;cursor:pointer;font-size:0.8rem;flex-shrink:0;">✕</button>`;
+    <button onclick="this.closest('div').remove();updateLecAchievement();"
+      style="background:transparent;border:none;color:var(--text-muted);font-size:1rem;cursor:pointer;padding:4px;">✕</button>
+  `;
   container.appendChild(div);
   updateLecAchievement();
 }
+function addActualRow(date='', count='', note='') {
+  _makeRegRow('actual-rows', 'rgba(232,122,170,0.5)', date, count, note);
+}
+function addEarlyRow(date='', count='', note='') {
+  _makeRegRow('early-rows', 'rgba(232,168,212,0.5)', date, count, note);
+}
+// legacy alias
+function addRegRow(date='', count='', note='') { addActualRow(date, count, note); }
 
 function updateLecAchievement() {
   const goal = parseInt(document.getElementById('lec-goal')?.value) || 0;
   const bar  = document.getElementById('lec-achievement-bar');
   if (!bar) return;
 
-  // Latest = last row's count input value
-  const countInputs = [...document.querySelectorAll('#reg-rows input[type="number"]')];
-  const counts = countInputs.map(i => parseInt(i.value) || 0);
-  const latest = counts.length ? counts[counts.length - 1] : 0;
+  // Actual = last actual-rows count; progress bar is based on actual only
+  const actualInputs = [...document.querySelectorAll('#actual-rows input[type="number"]')];
+  const earlyInputs  = [...document.querySelectorAll('#early-rows input[type="number"]')];
+  const actualCounts = actualInputs.map(i => parseInt(i.value) || 0);
+  const earlyCounts  = earlyInputs.map(i  => parseInt(i.value) || 0);
+  const latestActual = actualCounts.length ? actualCounts[actualCounts.length - 1] : 0;
+  const latestEarly  = earlyCounts.length  ? earlyCounts[earlyCounts.length - 1]   : 0;
 
-  if (!goal && !latest) { bar.style.display = 'none'; return; }
+  if (!goal && !latestActual && !latestEarly) { bar.style.display = 'none'; return; }
   bar.style.display = 'block';
 
-  const rawPct  = goal > 0 ? (latest / goal * 100) : 0;
+  const rawPct  = goal > 0 ? (latestActual / goal * 100) : 0;
   const pct     = Math.min(rawPct, 100);
   const pctText = goal > 0 ? rawPct.toFixed(1) + '%' : '—';
-  const gap     = goal > 0 ? Math.max(goal - latest, 0) : 0;
+  const gap     = goal > 0 ? Math.max(goal - latestActual, 0) : 0;
   const barColor = pct >= 80 ? '#7ec99a' : pct >= 50 ? '#e8a8d4' : '#c47aab';
 
-  document.getElementById('lec-current-count').textContent = latest.toLocaleString();
+  document.getElementById('lec-current-count').textContent = latestActual.toLocaleString();
   document.getElementById('lec-goal-display').textContent  = goal ? goal.toLocaleString() : '—';
   document.getElementById('lec-pct-display').textContent   = pctText;
   document.getElementById('lec-pct-display').style.color   = barColor;
   document.getElementById('lec-progress-bar').style.width  = pct.toFixed(1) + '%';
   document.getElementById('lec-progress-bar').style.background = barColor;
 
-  // Gap hint
+  // Early bird hint
+  let earlyEl = document.getElementById('lec-early-hint');
+  if (!earlyEl) {
+    earlyEl = document.createElement('div');
+    earlyEl.id = 'lec-early-hint';
+    earlyEl.style.cssText = 'font-family:"DM Mono",monospace;font-size:0.60rem;color:var(--gold);margin-top:4px;text-align:right;';
+    document.getElementById('lec-achievement-bar').appendChild(earlyEl);
+  }
+  earlyEl.textContent = latestEarly ? '☆ 早鳥意願登記 ' + latestEarly.toLocaleString() + ' 人' : '';
+
   let gapEl = document.getElementById('lec-gap-hint');
   if (!gapEl) {
     gapEl = document.createElement('div');
     gapEl.id = 'lec-gap-hint';
-    gapEl.style.cssText = 'font-family:"DM Mono",monospace;font-size:0.60rem;color:var(--text-muted);margin-top:5px;text-align:right;';
+    gapEl.style.cssText = 'font-family:"DM Mono",monospace;font-size:0.60rem;color:var(--text-muted);margin-top:2px;text-align:right;';
     document.getElementById('lec-achievement-bar').appendChild(gapEl);
   }
-  if (goal > 0 && latest < goal) {
-    gapEl.textContent = `距目標還差 ${gap.toLocaleString()} 人`;
+  if (goal > 0 && latestActual < goal) {
+    gapEl.textContent = '距目標還差 ' + gap.toLocaleString() + ' 人';
     gapEl.style.color = 'var(--text-muted)';
-  } else if (goal > 0 && latest >= goal) {
-    gapEl.textContent = `✓ 已達成目標`;
+  } else if (goal > 0 && latestActual >= goal) {
+    gapEl.textContent = '✓ 已達成目標';
     gapEl.style.color = '#7ec99a';
   } else {
     gapEl.textContent = '';
@@ -2395,20 +2433,25 @@ async function saveLecture() {
 
   if (!name) { alert('請輸入講座名稱'); return; }
 
-  const regs = [];
-  document.querySelectorAll('#reg-rows > div').forEach(row => {
-    const inputs = row.querySelectorAll('input');
-    const d = inputs[0].value.trim();
-    const c = parseInt(inputs[1].value) || 0;
-    const n = inputs[2].value.trim();
-    if (d || c) regs.push({ date: d, count: c, note: n });
-  });
+  const collectRows = (id) => {
+    const rows = [];
+    document.querySelectorAll('#' + id + ' > div').forEach(row => {
+      const inputs = row.querySelectorAll('input');
+      const d = inputs[0].value.trim();
+      const c = parseInt(inputs[1].value) || 0;
+      const n = inputs[2].value.trim();
+      if (d || c) rows.push({ date: d, count: c, note: n });
+    });
+    return rows;
+  };
+  const actualRegs = collectRows('actual-rows');
+  const earlyBirds = collectRows('early-rows');
 
   if (editingLectureId) {
     const idx = LECTURES.findIndex(l => l.id === editingLectureId);
-    if (idx >= 0) LECTURES[idx] = { ...LECTURES[idx], name, date, goal, note, regs };
+    if (idx >= 0) LECTURES[idx] = { ...LECTURES[idx], name, date, goal, note, actualRegs, earlyBirds };
   } else {
-    LECTURES.push({ id: Date.now(), name, date, goal, note, regs });
+    LECTURES.push({ id: Date.now(), name, date, goal, note, actualRegs, earlyBirds });
   }
 
   await saveLecturesToStorage();
@@ -2437,23 +2480,30 @@ function renderLectureList() {
   if (empty) empty.style.display = 'none';
 
   list.innerHTML = LECTURES.map(lec => {
-    const latest   = lec.regs?.length ? lec.regs[lec.regs.length - 1] : null;
-    const latestCount = latest?.count ?? 0;
-    const pct      = lec.goal > 0 ? Math.min((latestCount / lec.goal * 100), 100) : 0;
-    const pctText  = lec.goal > 0 ? (latestCount / lec.goal * 100).toFixed(1) + '%' : '—';
+    // Actual registrations
+    const actualArr  = lec.actualRegs  || lec.regs || [];
+    const earlyArr   = lec.earlyBirds  || [];
+    const latestActual = actualArr.length  ? actualArr[actualArr.length - 1]  : null;
+    const latestEarly  = earlyArr.length   ? earlyArr[earlyArr.length - 1]    : null;
+    const actualCount  = latestActual?.count ?? 0;
+    const earlyCount   = latestEarly?.count  ?? 0;
+    const pct      = lec.goal > 0 ? Math.min((actualCount / lec.goal * 100), 100) : 0;
+    const pctText  = lec.goal > 0 ? (actualCount / lec.goal * 100).toFixed(1) + '%' : '—';
     const barColor = pct >= 80 ? '#7ec99a' : pct >= 50 ? '#e8a8d4' : '#c47aab';
 
-    // Reg timeline
-    const timeline = (lec.regs || []).map((r, i) => {
-      const isLast = i === lec.regs.length - 1;
-      return `
-        <div style="display:flex;align-items:baseline;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);">
+    // Actual reg timeline
+    const makeTimeline = (arr, color, label) => arr.length ? `
+      <div style="font-family:'DM Mono',monospace;font-size:0.60rem;letter-spacing:0.08em;color:${color};margin:12px 0 6px;text-transform:uppercase;">${label}</div>
+      ${arr.map((r, i) => {
+        const isLast = i === arr.length - 1;
+        return `<div style="display:flex;align-items:baseline;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);">
           <div style="font-family:'DM Mono',monospace;font-size:0.62rem;color:var(--text-muted);min-width:90px;">${r.date}</div>
-          <div style="font-family:'Cormorant Garamond',serif;font-size:1.1rem;font-weight:700;color:${isLast ? 'var(--accent)' : 'var(--text)'};min-width:50px;">${r.count.toLocaleString()}</div>
+          <div style="font-family:'Cormorant Garamond',serif;font-size:1.1rem;font-weight:700;color:${isLast ? color : 'var(--text)'};min-width:50px;">${r.count.toLocaleString()}</div>
           <div style="font-size:0.65rem;color:var(--text-muted);">人${r.note ? '　' + r.note : ''}</div>
-          ${isLast && lec.goal > 0 ? `<div style="margin-left:auto;font-family:'DM Mono',monospace;font-size:0.65rem;color:${barColor};">達成 ${pctText}</div>` : ''}
         </div>`;
-    }).join('');
+      }).join('')}` : '';
+
+    const timeline = makeTimeline(actualArr, 'var(--accent3)', '✦ 實際報名') + makeTimeline(earlyArr, 'var(--gold)', '☆ 早鳥意願登記');
 
     return `
     <div style="
@@ -2487,10 +2537,10 @@ function renderLectureList() {
       <!-- KPI 橫排 -->
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:1px;background:var(--border);border:1px solid var(--border);border-radius:2px;margin-bottom:16px;overflow:hidden;">
         ${[
-          { label:'目標人數', val: lec.goal ? lec.goal.toLocaleString() + ' 人' : '—', color:'var(--text-muted)' },
-          { label:'最新報名', val: latestCount ? latestCount.toLocaleString() + ' 人' : '—', color:'var(--accent)' },
-          { label:'目標達成率', val: pctText, color: barColor },
-          { label:'最新統計日', val: latest?.date || '—', color:'var(--text-muted)' },
+          { label:'目標人數',     val: lec.goal ? lec.goal.toLocaleString() + ' 人' : '—', color:'var(--text-muted)' },
+          { label:'✦ 實際報名',  val: actualCount ? actualCount.toLocaleString() + ' 人' : '尚未開始', color:'var(--accent3)' },
+          { label:'☆ 早鳥意願', val: earlyCount  ? earlyCount.toLocaleString()  + ' 人' : '—',         color:'var(--gold)' },
+          { label:'目標達成率',   val: pctText,  color: barColor },
         ].map(k => `
           <div style="background:var(--surface);padding:14px 16px;">
             <div style="font-family:'DM Mono',monospace;font-size:0.58rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px;">${k.label}</div>
