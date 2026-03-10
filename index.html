@@ -216,52 +216,160 @@ body::before {
 }
 
 /* ══════════════════════════════════
-   RESPONSIVE / MOBILE
+   RESPONSIVE / MOBILE  ── 全面 RWD
 ══════════════════════════════════ */
 
-/* Tablet */
+/* ── Tablet 1024px ── */
 @media (max-width: 1024px) {
   .kpi-grid { grid-template-columns: repeat(3, 1fr) !important; }
+  .charts-row { grid-template-columns: 1fr !important; }
+  .charts-row-3 { grid-template-columns: 1fr 1fr !important; }
 }
 
-/* Mobile */
-@media (max-width: 640px) {
-  body { font-size: 14px; }
+/* ── Phablet 768px ── */
+@media (max-width: 768px) {
+  .masthead { padding: 18px 18px 14px; }
+  .brand-title { font-size: 1.4rem; }
+  .masthead-right { display: none; }
+  .tabs { padding: 0 10px; overflow-x: auto; flex-wrap: nowrap; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tab { padding: 10px 14px; font-size: 0.65rem; white-space: nowrap; flex-shrink: 0; }
+  .container { padding: 14px; }
+  .kpi-grid { grid-template-columns: 1fr 1fr !important; }
+  .kpi { padding: 16px 14px; }
+  .kpi-value { font-size: 1.8rem; }
+  .charts-grid { grid-template-columns: 1fr !important; gap: 12px; }
+  .charts-grid-full { grid-column: 1 !important; }
+  .charts-row { grid-template-columns: 1fr !important; }
+  .charts-row-3 { grid-template-columns: 1fr !important; }
+  .chart-wrap { height: 220px !important; }
+  .input-row { grid-template-columns: 1fr 1fr !important; }
+}
 
-  /* Hero banner — stack vertically */
-  #subscriber-hero { padding: 16px !important; }
-  #subscriber-hero > div:first-of-type {
+/* ── Mobile 480px ── */
+@media (max-width: 480px) {
+
+  /* === 基礎字體放大 === */
+  html { font-size: 16px; }
+  body { font-size: 1rem; -webkit-text-size-adjust: 100%; }
+
+  /* === Header === */
+  .masthead { padding: 12px 14px 10px; }
+  .brand-title { font-size: 1.25rem; }
+  .brand-sub { font-size: 0.6rem; letter-spacing: 0.12em; }
+  .masthead-right { display: none; }
+
+  /* === Tabs: 橫向滑動 === */
+  .tabs {
+    padding: 0 6px;
+    overflow-x: auto; flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch; scrollbar-width: none;
+  }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tab { padding: 10px 13px; font-size: 0.68rem; white-space: nowrap; flex-shrink: 0; }
+
+  /* === Container === */
+  .container { padding: 12px 12px 24px; }
+
+  /* === 最新一期亮點橫幅 === */
+  #latest-issue-banner { padding: 14px 14px !important; margin-bottom: 14px !important; }
+  #kpi-issue-tag { font-size: 1.5rem !important; }
+  #kpi-issue-date { font-size: 0.72rem !important; }
+  #kpi-subject-bar { font-size: 0.95rem !important; line-height: 1.55 !important; }
+  #kpi-top-click { font-size: 0.88rem !important; line-height: 1.5 !important; }
+
+  /* === Hero 訂報區塊 === */
+  #subscriber-hero { padding: 14px !important; }
+  #hero-count { font-size: 2.8rem !important; }
+  #goal-pct { font-size: 2.4rem !important; }
+  #hero-growth { font-size: 0.85rem !important; }
+  #hero-date { font-size: 0.68rem !important; }
+  #goal-days { font-size: 1.0rem !important; }
+  #goal-daily { font-size: 1.0rem !important; }
+
+  /* 訂報 hero 三欄 → 直排 */
+  #subscriber-hero > div[style*="justify-content:space-between"] {
     flex-direction: column !important;
-    align-items: flex-start !important;
+    gap: 18px !important;
+  }
+  #subscriber-hero > div[style*="justify-content:space-between"] > div {
+    text-align: left !important;
   }
 
-  /* KPI grid — 2 columns */
+  /* === KPI Grid 2欄，數字放大 === */
   .kpi-grid { grid-template-columns: 1fr 1fr !important; gap: 0 !important; }
-  .kpi-card { padding: 14px 12px !important; }
-  .kpi-value { font-size: 1.5rem !important; }
-  .kpi-label { font-size: 0.55rem !important; }
+  .kpi { padding: 14px 12px !important; }
+  .kpi-value { font-size: 1.8rem !important; }
+  .kpi-label { font-size: 0.62rem !important; letter-spacing: 0.05em !important; margin-bottom: 8px !important; }
+  .kpi-sub { font-size: 0.65rem !important; margin-top: 4px !important; }
+  .kpi-unit { font-size: 0.9rem !important; }
 
-  /* Charts — single column, taller */
-  .charts-grid { grid-template-columns: 1fr !important; gap: 12px !important; }
+  /* === 圖表單欄 === */
+  .charts-grid { grid-template-columns: 1fr !important; gap: 10px !important; }
   .charts-grid-full { grid-column: 1 !important; }
   .chart-wrap { height: 200px !important; }
-  .chart-header { padding: 12px 14px !important; }
-  .chart-title { font-size: 0.70rem !important; }
+  .chart-header { padding: 10px 12px !important; }
+  .chart-title { font-size: 0.78rem !important; }
+  .chart-legend { gap: 8px !important; font-size: 0.60rem !important; flex-wrap: wrap !important; }
+  .chart-body { padding: 10px 10px !important; }
 
-  /* Issue nav buttons */
-  #issue-nav { flex-wrap: wrap !important; gap: 6px !important; }
-  #issue-kpi { grid-template-columns: 1fr 1fr !important; }
+  /* === 表格橫向滾動 === */
+  .chart-card { overflow-x: auto !important; }
+  .data-table { min-width: 460px; font-size: 0.78rem; }
+  .data-table th { font-size: 0.58rem !important; padding: 9px 10px !important; }
+  .data-table td { padding: 9px 10px !important; font-size: 0.78rem !important; }
 
-  /* Tables: scroll horizontally */
-  .chart-card { overflow-x: auto; }
-  .chart-body table { min-width: 500px; }
+  /* === Section Label === */
+  .section-label { font-size: 0.62rem !important; margin-bottom: 12px !important; }
 
-  /* Report mode panels */
-  #panel-edit, #panel-view { padding: 14px !important; }
-  .mode-toggle { flex-wrap: wrap; gap: 6px; }
+  /* === 期數切換按鈕 === */
+  .issue-nav { gap: 6px !important; flex-wrap: wrap !important; }
+  .issue-btn { padding: 8px 14px !important; font-size: 0.70rem !important; }
 
-  /* Progress bar labels */
-  #subscriber-hero canvas { height: 44px !important; }
+  /* === 新增數據表單 === */
+  .input-row { grid-template-columns: 1fr !important; gap: 10px !important; }
+  .input-header { padding: 12px 14px !important; }
+  .input-header h3 { font-size: 0.88rem !important; }
+  .input-body { padding: 12px 14px !important; }
+  .csv-hint { font-size: 0.70rem !important; line-height: 1.75 !important; }
+  textarea { font-size: 0.78rem !important; }
+  .field label { font-size: 0.62rem !important; }
+  .field input, .field select { font-size: 0.82rem !important; padding: 9px 11px !important; }
+
+  /* === 按鈕 === */
+  .btn { padding: 10px 18px !important; font-size: 0.72rem !important; }
+  .btn-row { gap: 8px !important; flex-wrap: wrap !important; }
+  .fmt-btn { padding: 6px 10px !important; font-size: 0.70rem !important; }
+
+  /* === 產出報告 === */
+  #report-editor { font-size: 0.95rem !important; line-height: 1.9 !important; }
+  #report-editor h2 { font-size: 1.05rem !important; }
+  #report-editor h3 { font-size: 0.95rem !important; }
+  #report-editor p, #report-editor li { font-size: 0.92rem !important; line-height: 1.85 !important; }
+  #report-editor td, #report-editor th { font-size: 0.75rem !important; padding: 7px 8px !important; }
+  #report-editor table { display: block !important; overflow-x: auto !important; }
+  #view-body { font-size: 0.95rem !important; line-height: 1.9 !important; }
+  #view-body h3 { font-size: 0.95rem !important; }
+  #view-body p, #view-body li { font-size: 0.92rem !important; }
+
+  /* === 講座成效卡片 === */
+  #lecture-list > div { padding: 14px !important; }
+
+  /* === 講座 Modal === */
+  #lecture-modal > div { padding: 20px 16px !important; max-width: 100% !important; }
+
+  /* === Footer === */
+  .dash-footer {
+    flex-direction: column !important; gap: 5px !important;
+    text-align: center !important; font-size: 0.62rem !important;
+    padding-top: 14px !important;
+  }
+
+  /* === 圖片不超出 === */
+  img { max-width: 100% !important; height: auto !important; }
+
+  /* === 訂報人數歷史記錄表 === */
+  #sub-log-table-wrap { overflow-x: auto !important; }
 }
 
 .chart-header {
@@ -2738,6 +2846,56 @@ function renderSubLog() {
       + '</div>';
   });
   el.innerHTML = rows.join('');
+}
+
+
+// ══════════════════════════════════════
+//  MOBILE RWD — 修正 inline style 衝突
+// ══════════════════════════════════════
+function applyMobileFixes() {
+  if (window.innerWidth > 480) return;
+
+  // Hero 三欄訂報資訊 → 直排
+  var hero = document.getElementById('subscriber-hero');
+  if (hero) {
+    hero.querySelectorAll('div[style*="justify-content:space-between"], div[style*="justify-content: space-between"]').forEach(function(r) {
+      r.style.flexDirection = 'column';
+      r.style.gap = '16px';
+    });
+    var rightDiv = hero.querySelector('div[style*="text-align:right"]');
+    if (rightDiv) { rightDiv.style.textAlign = 'left'; }
+  }
+
+  // KPI inline grid → 2-col
+  document.querySelectorAll('[style*="grid-template-columns"]').forEach(function(el) {
+    var cols = el.style.gridTemplateColumns;
+    if (cols && (cols.includes('repeat(5') || cols.includes('repeat(4') || cols.includes('repeat(3') || cols.includes('repeat(auto-fit'))) {
+      el.style.gridTemplateColumns = '1fr 1fr';
+    }
+  });
+
+  // 講座 KPI → 2-col
+  document.querySelectorAll('#lecture-list div[style*="grid-template-columns"]').forEach(function(el) {
+    el.style.gridTemplateColumns = '1fr 1fr';
+  });
+
+  // 圖片不超出
+  document.querySelectorAll('#view-body img, #report-editor img').forEach(function(img) {
+    img.style.maxWidth = '100%';
+    img.style.height = 'auto';
+  });
+}
+
+window.addEventListener('load', function() { setTimeout(applyMobileFixes, 300); });
+window.addEventListener('resize', function() { if (window.innerWidth <= 480) applyMobileFixes(); });
+
+// 分頁切換後重跑
+var _origSwitchTab = window.switchTab;
+if (typeof switchTab === 'function') {
+  window.switchTab = function(t) {
+    if (_origSwitchTab) _origSwitchTab(t);
+    setTimeout(applyMobileFixes, 100);
+  };
 }
 
 </script>
