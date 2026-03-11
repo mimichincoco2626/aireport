@@ -1345,10 +1345,11 @@ let DATA = [
   { date:'2026/2/23', issue:'NO3', group:'訂戶',     subject:'【AI×教育雙週報03期】開學收心！有AI幫忙練習，成績反降17%？OECD最新警示', sent:2729, opened:1509, clicked:203, unsub:3, clickable:16, openRate:48.43, clickRate:5.00, ctOR:13.45, topClick:'AI 時代逆襲！美國加州強制小學教「草寫」' },
   { date:'2026/2/23', issue:'NO3', group:'訂戶次週',  subject:'【AI×教育雙週報03期】開學收心！有AI幫忙練習，成績反降17%？OECD最新警示', sent:2729, opened:1802, clicked:206, unsub:6, clickable:16, openRate:53.19, clickRate:6.34, ctOR:14.43, topClick:'拿掉 AI 後成績暴跌 17%？OECD 警示' },
   { date:'2026/2/23', issue:'NO3', group:'非訂戶',    subject:'您的試閱即將結束！立即訂閱解鎖「蘇格拉底式」AI 教學實戰守則', sent:23443, opened:11911, clicked:482, unsub:15, clickable:16, openRate:37.23, clickRate:1.42, ctOR:4.05, topClick:'立刻點擊這裡免費訂閱雙週報' },
+    { date:'2026/3/9', issue:'NO4', group:'訂戶', subject:'【AI×教育雙週報04期】從 WBC 看 AI 時代：學霸不夠用，成才靠的是「韌性與開放心態」', sent:1848, opened:1266, clicked:178, unsub:0, clickable:18, openRate:46.19, clickRate:4.53, ctOR:14.06, topClick:'WBC 2026 經典賽教我們的十堂人生課：輸贏中學勇氣、韌性' }
 ];
 
-const ISSUES = ['NO1','NO2','NO3'];
-let selectedIssue = 'NO3';
+const ISSUES = ['NO1','NO2','NO3','NO4'];
+let selectedIssue = 'NO4';
 let chartInstances = {};
 let aiText = '';
 
@@ -1378,7 +1379,7 @@ let SUBSCRIBER_LOG = [
   { date:'2026/2/23',  count:2729, note:'大親臉書封面更換＋貼文' },
   { date:'2026/3/4',   count:2795, note:'天下換貼 3/4（三）1030' },
   { date:'2026/3/6',   count:2812, note:'單推三位專欄作家金句圖卡' },
-  { date:'2026/3/9',   count:2827, note:'《親子共學 AI 指令懶人包》下載上線帶動訂閱' }
+  { date:'2026/3/11',  count:2834, note:'NO4發報帶動訂閱' }
 ];
 
 
@@ -1647,7 +1648,8 @@ function renderKPIs() {
   const subData  = DATA.filter(d => d.group === '訂戶');
   const sub2Data = DATA.filter(d => d.group === '訂戶次週');
   const latestSub  = subData[subData.length - 1];
-  const latestSub2 = sub2Data[sub2Data.length - 1];
+  // 次週必須與最新期 issue 相同，否則視為尚無次週數據
+  const latestSub2 = latestSub ? sub2Data.find(d => d.issue === latestSub.issue) ?? null : null;
   const prevSub    = subData.length > 1 ? subData[subData.length - 2] : null;
 
   // Populate latest-issue banner
@@ -1668,7 +1670,7 @@ function renderKPIs() {
     { label:'當週 點擊率', value: latestSub.clickRate.toFixed(1), unit:'%',
       sub: prevSub ? trend(latestSub.clickRate, prevSub.clickRate,'%') : 'NO1 基準', color:'pink' },
     { label:'開點率', value: latestSub.ctOR.toFixed(1), unit:'%',
-      sub:'點擊 ÷ 開信', color:'pink' },
+      sub: prevSub ? trend(latestSub.ctOR, prevSub.ctOR,'%') : 'NO1 基準', color:'pink' },
     { label:'退訂人數', value: cleanInt(latestSub.unsub), unit:'人',
       sub: prevSub ? trendInt(latestSub.unsub, prevSub.unsub,'人') : '本期', color:'red' },
   ]);
@@ -2013,13 +2015,16 @@ function renderIssueDetail(issue) {
   if (!sub) return;
 
   // KPI cards
+  // 明確確認此期有次週資料（issue 必須完全吻合）
+  const hasSub2 = !!DATA.find(d => d.issue === issue && d.group === '訂戶次週');
   document.getElementById('issue-kpi').innerHTML = buildKPIs([
     { label:'當週 開信率', value: sub.openRate.toFixed(1), unit:'%', sub: sub.date, color:'pink' },
-    { label:'次週 開信率', value: sub2 ? sub2.openRate.toFixed(1) : '—', unit: sub2?'%':'',
-      sub: sub2 ? `較當週 +${(sub2.openRate - sub.openRate).toFixed(1)}%` : '尚無次週數據', color:'green' },
+    { label:'次週 開信率', value: hasSub2 ? sub2.openRate.toFixed(1) : '—', unit: hasSub2?'%':'',
+      sub: hasSub2 ? `較當週 +${(sub2.openRate - sub.openRate).toFixed(1)}%` : '次週數據尚未提供', color:'green' },
     { label:'當週 點擊率', value: sub.clickRate.toFixed(1), unit:'%', sub:'當週發送', color:'pink' },
-    { label:'次週 點擊率', value: sub2 ? sub2.clickRate.toFixed(1) : '—', unit: sub2?'%':'', sub:'次週追蹤', color:'green' },
-    { label:'開點率', value: sub.ctOR.toFixed(1), unit:'%', sub:'點擊 ÷ 開信', color:'pink' },
+    { label:'次週 點擊率', value: hasSub2 ? sub2.clickRate.toFixed(1) : '—', unit: hasSub2?'%':'',
+      sub: hasSub2 ? '次週追蹤' : '次週數據尚未提供', color:'green' },
+    { label:'開點率（當週）', value: sub.ctOR.toFixed(1), unit:'%', sub:'點擊 ÷ 開信', color:'pink' },
     { label:'退訂人數', value: cleanInt(sub.unsub), unit:'人', sub:'本期訂戶', color:'red' },
   ]);
 
@@ -2354,17 +2359,17 @@ async function initLectures() {
     date: '6月初',
     goal: 600,
     note: '',
-    earlyBirds: [{ date: '2026/3/10', count: 13, note: '填表登記意願' }],
+    earlyBirds: [{ date: '2026/3/10', count: 17, note: '填表登記意願' }],
     actualRegs:  [],
     premiumOrders: 0
   }];
   try {
-    const res = await window.storage.get('lectures_v3');
+    const res = await window.storage.get('lectures_v4');
     if (res) {
       LECTURES = JSON.parse(res.value);
     } else {
       LECTURES = SEED;
-      await window.storage.set('lectures_v3', JSON.stringify(LECTURES));
+      await window.storage.set('lectures_v4', JSON.stringify(LECTURES));
     }
   } catch(e) { LECTURES = SEED; }
   renderLectureList();
@@ -2372,7 +2377,7 @@ async function initLectures() {
 
 async function saveLecturesToStorage() {
   try {
-    await window.storage.set('lectures_v3', JSON.stringify(LECTURES));
+    await window.storage.set('lectures_v4', JSON.stringify(LECTURES));
   } catch(e) {}
 }
 
